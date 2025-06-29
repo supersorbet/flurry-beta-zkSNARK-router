@@ -1,0 +1,13 @@
+# Foundry
+cache/
+out/
+lib/
+
+# Environment variables
+.env
+
+# Gas snapshots
+.gas-snapshot
+
+# IDE
+.vscode/ 

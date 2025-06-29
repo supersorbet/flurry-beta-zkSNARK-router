@@ -54,10 +54,15 @@ contract B52zTest is Test {
         assertEq(instances[3], newInstance);
     }
 
-    // This is just a mock test - in reality we'd need proper zk proofs for withdrawal
+    //just aamock test - in reality we'd need proper zk proofs for withdrawal
     function testDeposit() public {
+        // Choose one of the pre-created denominations that we know exists (1 ether)
         uint256 denomination = 1 ether;
         bytes32 mockCommitment = keccak256(abi.encodePacked("test commitment"));
+        
+        // Get the instance
+        address instance = factory.instances(address(token), denomination);
+        require(instance != address(0), "Instance not found");
         
         // Approve tokens
         vm.startPrank(alice);
@@ -68,7 +73,6 @@ contract B52zTest is Test {
         vm.stopPrank();
         
         // Check balance
-        address instance = factory.instances(address(token), denomination);
         assertEq(token.balanceOf(instance), denomination);
     }
 } 

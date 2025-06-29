@@ -28,7 +28,7 @@ interface IGroth16Verifier {
 }
 
 /// @title B52z Instance Interface
-/// @notice Interface for interacting with blender instances
+/// @notice Interface for interacting with mixer instances
 interface IB52zInstance {
     /// @notice Make a deposit into the mixer
     /// @param commitment The commitment hash
@@ -52,11 +52,11 @@ interface IB52zInstance {
         uint256 fee
     ) external;
     
-    /// @notice Get the denomination of this blender
+    /// @notice Get the denomination of this mixer
     /// @return The token denomination
     function denomination() external view returns (uint256);
     
-    /// @notice Get the merkle root of this blender
+    /// @notice Get the merkle root of this mixer
     /// @return The current merkle root
     function currentRoot() external view returns (bytes32);
     
@@ -67,7 +67,7 @@ interface IB52zInstance {
 }
 
 /// @title B52z Factory
-/// @notice Creates and manages blender instances for different denominations
+/// @notice Creates and manages mixer instances for different denominations
 contract B52zFactory is OwnableRoles {
     /// @notice Error thrown when trying to create an instance that already exists
     /// @param token The token address
@@ -138,6 +138,7 @@ contract B52zFactory is OwnableRoles {
         b52Token = _b52Token;
         verifier = _verifier;
         
+        // Deploy the implementation contract that will be cloned
         instanceImplementation = address(
             new B52zInstance(_b52Token, 0, _verifier, 20)
         );
@@ -146,10 +147,10 @@ contract B52zFactory is OwnableRoles {
         _grantRoles(msg.sender, GOVERNANCE_ROLE | INSTANCE_MANAGER_ROLE);
     }
 
-    /// @notice Create a new blender instance
+    /// @notice Create a new mixer instance
     /// @param denomination The denomination amount
     /// @return instance The created instance address
-    function createInstance(uint256 denomination)
+    function createIII(uint256 denomination)
         external
         returns (address instance)
     {
@@ -161,19 +162,23 @@ contract B52zFactory is OwnableRoles {
             revert InstanceAlreadyExists(b52Token, denomination);
         }
         
+        // Create initialization data
         bytes memory initData = abi.encodeWithSelector(
             B52zInstance.initialize.selector,
             denomination
         );
         
+        // Create deterministic clone
         instance = LibClone.cloneDeterministic(
             instanceImplementation,
             keccak256(abi.encodePacked(b52Token, denomination))
         );
         
+        // Initialize the clone
         (bool success, ) = instance.call(initData);
         if (!success) revert InitializationFailed();
 
+        // Register the instance
         instances[b52Token][denomination] = instance;
         allInstances.push(instance);
 
@@ -217,7 +222,7 @@ contract B52zFactory is OwnableRoles {
 }
 
 /// @title B52z Router
-/// @notice Routes transactions to appropriate blender instances
+/// @notice Routes transactions to appropriate mixer instances
 contract B52zRouter is ReentrancyGuard {
     /// @notice Error thrown when an instance is not found for a denomination
     /// @param denomination The requested denomination
@@ -242,9 +247,11 @@ contract B52zRouter is ReentrancyGuard {
         external
         nonReentrant
     {
+        // Get instance for this denomination
         address instance = factory.instances(factory.b52Token(), denomination);
         if (instance == address(0)) revert InstanceNotFound(denomination);
 
+        // Transfer tokens to the instance
         SafeTransferLib.safeTransferFrom(
             factory.b52Token(),
             msg.sender,
@@ -252,6 +259,7 @@ contract B52zRouter is ReentrancyGuard {
             denomination
         );
 
+        // Call deposit on the instance
         IB52zInstance(instance).deposit(commitment);
     }
 
@@ -274,9 +282,11 @@ contract B52zRouter is ReentrancyGuard {
         address relayer,
         uint256 fee
     ) external nonReentrant {
+        // Get instance for this denomination
         address instance = factory.instances(factory.b52Token(), denomination);
         if (instance == address(0)) revert InstanceNotFound(denomination);
 
+        // Call withdraw on the instance
         IB52zInstance(instance).withdraw(
             _pA,
             _pB,
@@ -407,10 +417,12 @@ contract B52zInstance is IB52zInstance, ReentrancyGuard {
         verifier = IGroth16Verifier(_verifier);
         merkleTreeHeight = _merkleTreeHeight;
 
+        // Initialize the Merkle tree with default values
         bytes32[] memory _zeros = new bytes32[](_merkleTreeHeight + 1);
         bytes32 currentZero = keccak256(abi.encodePacked("B_52_Z_INIT_ZERO"));
         _zeros[0] = currentZero;
 
+        // Calculate zero values for each level
         for (uint8 i = 1; i <= _merkleTreeHeight; i++) {
             currentZero = _hashLeftRight(currentZero, currentZero);
             _zeros[i] = currentZero;
@@ -910,21 +922,13 @@ contract B52zDeployer {
     
     /// @notice Constructor - creates and initializes the system
     constructor() {
-        // 1. Deploy token
         token = new B52Token();
-        
-        // 2. Deploy verifier
         verifier = new Groth16Verifier();
-        
-        // 3. Deploy factory
         factory = new B52zFactory(address(token), address(verifier));
-        
-        // 4. Deploy router
         router = new B52zRouter(address(factory));
         
-        // 5. Create instances for common denominations
-        factory.createInstance(1 * 10**18);      // 1 token
-        factory.createInstance(10 * 10**18);     // 10 tokens
-        factory.createInstance(100 * 10**18);    // 100 tokens
+        factory.createIII(1 * 10**18);      // 1 token
+        factory.createIII(10 * 10**18);     // 10 tokens
+        factory.createIII(100 * 10**18);    // 100 tokens
     }
-} 
+}

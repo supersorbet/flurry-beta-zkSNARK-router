@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console2} from "forge-std/Script.sol";
 import {B52zDeployer} from "../src/B52z.sol";
 
 contract DeployB52z is Script {
@@ -13,12 +13,12 @@ contract DeployB52z is Script {
         B52zDeployer deployer = new B52zDeployer();
 
         // Log the deployed addresses
-        console.log("B52z Deployment Addresses:");
-        console.log("---------------------------------------------------");
-        console.log("B52Token:", address(deployer.token()));
-        console.log("Groth16Verifier:", address(deployer.verifier()));
-        console.log("B52zFactory:", address(deployer.factory()));
-        console.log("B52zRouter:", address(deployer.router()));
+        console2.log("B52z Deployment Addresses:");
+        console2.log("---------------------------------------------------");
+        console2.log("B52Token: %s", address(deployer.token()));
+        console2.log("Groth16Verifier: %s", address(deployer.verifier()));
+        console2.log("B52zFactory: %s", address(deployer.factory()));
+        console2.log("B52zRouter: %s", address(deployer.router()));
         
         vm.stopBroadcast();
     }
